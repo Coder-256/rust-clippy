@@ -1,10 +1,6 @@
 // ignore-64bit
 
-#![warn(
-    clippy::fn_to_numeric_cast,
-    clippy::fn_to_numeric_cast_usize,
-    clippy::fn_to_numeric_cast_with_truncation
-)]
+#![warn(clippy::fn_to_numeric_cast, clippy::fn_to_numeric_cast_usize)]
 
 fn foo() -> String {
     String::new()

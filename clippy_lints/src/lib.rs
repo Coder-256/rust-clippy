@@ -470,6 +470,10 @@ pub fn register_plugins(store: &mut rustc_lint::LintStore, sess: &Session, conf:
         "clippy::regex_macro",
         "the regex! macro has been removed from the regex crate in 2018",
     );
+    store.register_removed(
+        "clippy::fn_to_numeric_cast_with_truncation",
+        "this lint is now a part of `fn_to_numeric_cast`",
+    );
     // end deprecated lints, do not remove this comment, it’s used in `update_lints`
 
     // begin register lints, do not remove this comment, it’s used in `update_lints`
@@ -823,7 +827,6 @@ pub fn register_plugins(store: &mut rustc_lint::LintStore, sess: &Session, conf:
         &types::CHAR_LIT_AS_U8,
         &types::FN_TO_NUMERIC_CAST,
         &types::FN_TO_NUMERIC_CAST_USIZE,
-        &types::FN_TO_NUMERIC_CAST_WITH_TRUNCATION,
         &types::IMPLICIT_HASHER,
         &types::INVALID_UPCAST_COMPARISONS,
         &types::LET_UNIT_VALUE,
@@ -1459,7 +1462,6 @@ pub fn register_plugins(store: &mut rustc_lint::LintStore, sess: &Session, conf:
         LintId::of(&types::CHAR_LIT_AS_U8),
         LintId::of(&types::FN_TO_NUMERIC_CAST),
         LintId::of(&types::FN_TO_NUMERIC_CAST_USIZE),
-        LintId::of(&types::FN_TO_NUMERIC_CAST_WITH_TRUNCATION),
         LintId::of(&types::REDUNDANT_ALLOCATION),
         LintId::of(&types::TYPE_COMPLEXITY),
         LintId::of(&types::UNIT_ARG),
@@ -1578,7 +1580,6 @@ pub fn register_plugins(store: &mut rustc_lint::LintStore, sess: &Session, conf:
         LintId::of(&try_err::TRY_ERR),
         LintId::of(&types::FN_TO_NUMERIC_CAST),
         LintId::of(&types::FN_TO_NUMERIC_CAST_USIZE),
-        LintId::of(&types::FN_TO_NUMERIC_CAST_WITH_TRUNCATION),
         LintId::of(&unsafe_removed_from_name::UNSAFE_REMOVED_FROM_NAME),
         LintId::of(&unused_unit::UNUSED_UNIT),
         LintId::of(&write::PRINTLN_EMPTY_STRING),

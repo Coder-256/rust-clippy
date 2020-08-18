@@ -690,13 +690,6 @@ pub static ref ALL_LINTS: Vec<Lint> = vec![
         module: "types",
     },
     Lint {
-        name: "fn_to_numeric_cast_with_truncation",
-        group: "style",
-        desc: "casting a function pointer to a numeric type not wide enough to store the address",
-        deprecation: None,
-        module: "types",
-    },
-    Lint {
         name: "for_kv_map",
         group: "style",
         desc: "looping on a map using `iter` when `keys` or `values` would do",

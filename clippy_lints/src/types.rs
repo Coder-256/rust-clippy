@@ -1125,36 +1125,6 @@ declare_clippy_lint! {
     "casting a function to a usize"
 }
 
-declare_clippy_lint! {
-    /// **What it does:** Checks for casts of a function pointer to a numeric type not wide enough to
-    /// store address.
-    ///
-    /// **Why is this bad?**
-    /// Such a cast discards some bits of the function's address. If this is intended, it would be more
-    /// clearly expressed by casting to usize first, then casting the usize to the intended type (with
-    /// a comment) to perform the truncation.
-    ///
-    /// **Example**
-    ///
-    /// ```rust
-    /// // Bad
-    /// fn fn1() -> i16 {
-    ///     1
-    /// };
-    /// let _ = fn1 as i32;
-    ///
-    /// // Better: Cast to usize first, then comment with the reason for the truncation
-    /// fn fn2() -> i16 {
-    ///     1
-    /// };
-    /// let fn_ptr = fn2 as usize;
-    /// let fn_ptr_truncated = fn_ptr as i32;
-    /// ```
-    pub FN_TO_NUMERIC_CAST_WITH_TRUNCATION,
-    style,
-    "casting a function pointer to a numeric type not wide enough to store the address"
-}
-
 /// Returns the size in bits of an integral type.
 /// Will return 0 if the type is not an int or uint variant
 fn int_ty_to_nbits(typ: Ty<'_>, tcx: TyCtxt<'_>) -> u64 {
@@ -1400,7 +1370,6 @@ declare_lint_pass!(Casts => [
     CAST_PTR_ALIGNMENT,
     FN_TO_NUMERIC_CAST,
     FN_TO_NUMERIC_CAST_USIZE,
-    FN_TO_NUMERIC_CAST_WITH_TRUNCATION,
 ]);
 
 // Check if the given type is either `core::ffi::c_void` or
@@ -1575,11 +1544,11 @@ fn lint_cast_ptr_alignment<'tcx>(cx: &LateContext<'tcx>, expr: &Expr<'_>, cast_f
     }
 }
 
-fn lint_fn_to_numeric_cast(
-    cx: &LateContext<'_>,
+fn lint_fn_to_numeric_cast<'tcx>(
+    cx: &LateContext<'tcx>,
     expr: &Expr<'_>,
     cast_expr: &Expr<'_>,
-    cast_from: Ty<'_>,
+    cast_from: Ty<'tcx>,
     cast_to: Ty<'_>,
 ) {
     // We only want to check casts to `ty::Uint` or `ty::Int`
@@ -1594,70 +1563,80 @@ fn lint_fn_to_numeric_cast(
     if is_def || is_ptr {
         let mut applicability = Applicability::MaybeIncorrect;
         let from_snippet = snippet_with_applicability(cx, cast_expr.span, "x", &mut applicability);
-
         let to_nbits = int_ty_to_nbits(cast_to, cx.tcx);
+        let truncate = to_nbits < cx.tcx.data_layout.pointer_size.bits();
+        let to_usize = cast_to.kind == ty::Uint(UintTy::Usize);
+        assert!(!(truncate && to_usize), "fn pointer cast to usize would truncate?");
 
-        if is_def {
-            if to_nbits < cx.tcx.data_layout.pointer_size.bits() {
-                span_lint_and_sugg(
-                    cx,
-                    FN_TO_NUMERIC_CAST_WITH_TRUNCATION,
-                    expr.span,
-                    &format!(
+        // `suggestions` is a Vec of `(help_msg, suggestion)`
+        let (lint, msg, suggestions) = if is_def {
+            let try_calling = ("try calling the function", format!("{}() as {}", from_snippet, cast_to));
+            if truncate {
+                // def -> smaller
+                (
+                    FN_TO_NUMERIC_CAST,
+                    format!(
                         "casting *pointer* to function `{}` as `{}`, which truncates the value",
                         from_snippet, cast_to
                     ),
-                    "try",
-                    format!("{}() as {}", from_snippet, cast_to),
-                    applicability,
-                );
-            } else if cast_to.kind == ty::Uint(UintTy::Usize) {
-                span_lint_and_sugg(
-                    cx,
+                    vec![try_calling],
+                )
+            } else if to_usize {
+                // def -> usize
+                (
                     FN_TO_NUMERIC_CAST_USIZE,
-                    expr.span,
-                    &format!("casting *pointer* to function `{}` as `{}`", from_snippet, cast_to),
-                    "try",
-                    format!("{}() as {}", from_snippet, cast_to),
-                    applicability,
-                );
+                    format!("casting *pointer* to function `{}` as `{}`", from_snippet, cast_to),
+                    vec![
+                        try_calling,
+                        (
+                            "try casting to a function pointer first",
+                            format!(
+                                "{} as {} as {}",
+                                from_snippet,
+                                cast_from.fn_sig(cx.tcx).skip_binder(),
+                                cast_to
+                            ),
+                        ),
+                    ],
+                )
             } else {
-                span_lint_and_sugg(
-                    cx,
+                // def -> larger
+                (
                     FN_TO_NUMERIC_CAST,
-                    expr.span,
-                    &format!("casting *pointer* to function `{}` as `{}`", from_snippet, cast_to),
-                    "try",
-                    format!("{}() as {}", from_snippet, cast_to),
-                    applicability,
-                );
+                    format!("casting *pointer* to function `{}` as `{}`", from_snippet, cast_to),
+                    vec![try_calling],
+                )
             }
-        } else if is_ptr {
-            if to_nbits < cx.tcx.data_layout.pointer_size.bits() {
-                span_lint_and_sugg(
-                    cx,
-                    FN_TO_NUMERIC_CAST_WITH_TRUNCATION,
-                    expr.span,
-                    &format!(
+        } else if !to_usize {
+            let try_cast_usize = ("try casting to usize", format!("{} as usize", from_snippet));
+            if truncate {
+                // ptr -> smaller
+                (
+                    FN_TO_NUMERIC_CAST,
+                    format!(
                         "casting function pointer `{}` to `{}`, which truncates the value",
                         from_snippet, cast_to
                     ),
-                    "try",
-                    format!("{} as usize", from_snippet),
-                    applicability,
-                );
-            } else if cast_to.kind != ty::Uint(UintTy::Usize) {
-                span_lint_and_sugg(
-                    cx,
+                    vec![try_cast_usize],
+                )
+            } else {
+                // ptr -> larger
+                (
                     FN_TO_NUMERIC_CAST,
-                    expr.span,
-                    &format!("casting function pointer `{}` to `{}`", from_snippet, cast_to),
-                    "try",
-                    format!("{} as usize", from_snippet),
-                    applicability,
-                );
+                    format!("casting function pointer `{}` to `{}`", from_snippet, cast_to),
+                    vec![try_cast_usize],
+                )
             }
-        }
+        } else {
+            // ptr -> usize
+            return;
+        };
+
+        span_lint_and_then(cx, lint, expr.span, &msg, |diag| {
+            for (help_msg, suggestion) in suggestions {
+                diag.span_suggestion(expr.span, help_msg, suggestion, applicability);
+            }
+        });
     }
 }
 

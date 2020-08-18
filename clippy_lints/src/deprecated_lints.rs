@@ -163,3 +163,11 @@ declare_deprecated_lint! {
     pub REGEX_MACRO,
     "the regex! macro has been removed from the regex crate in 2018"
 }
+
+declare_deprecated_lint! {
+    /// **What it does:** Nothing. This lint has been deprecated.
+    ///
+    /// **Deprecation reason:** This lint is now a part of `fn_to_numeric_cast`.
+    pub FN_TO_NUMERIC_CAST_WITH_TRUNCATION,
+    "this lint is now a part of `fn_to_numeric_cast`"
+}
